@@ -89,16 +89,8 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest
 
-    # Option 1: Deploy to ECS
-    - name: Deploy to ECS
-      if: ${{ vars.DEPLOY_TARGET == 'ECS' }}
-      run: |
-        # Update task definition with new image
-        aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
-
-    # Option 2: Deploy to EC2
+    # Deploy to EC2
     - name: Deploy to EC2
-      if: ${{ vars.DEPLOY_TARGET == 'EC2' }}
       env:
         EC2_HOST: ${{ secrets.EC2_HOST }}
         EC2_USER: ${{ secrets.EC2_USER }}
@@ -108,12 +100,47 @@ jobs:
         echo "$EC2_KEY" > ec2-key.pem
         chmod 600 ec2-key.pem
         
-        # Deploy to EC2
+        # Initial setup if needed
         ssh -o StrictHostKeyChecking=no -i ec2-key.pem $EC2_USER@$EC2_HOST << 'EOF'
+          # Check if Docker is installed
+          if ! command -v docker &> /dev/null; then
+            echo "Installing Docker..."
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sudo sh get-docker.sh
+            sudo usermod -aG docker ubuntu
+            
+            # Install Docker Compose
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Clone or update repository
+          if [ ! -d "/home/ubuntu/aws-docker" ]; then
+            git clone https://github.com/${{ github.repository }}.git /home/ubuntu/aws-docker
+          fi
+          
           cd /home/ubuntu/aws-docker
           git pull origin main
-          docker-compose down
-          docker-compose pull
+          
+          # Create .env file with production values
+          cat > .env << 'ENVEOF'
+          DATABASE_URL=jdbc:mysql://mysql:3306/aws_docker_db?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+          DATABASE_USERNAME=appuser
+          DATABASE_PASSWORD=apppassword
+          DATABASE_DRIVER=com.mysql.cj.jdbc.Driver
+          MYSQL_ROOT_PASSWORD=password
+          MYSQL_DATABASE=aws_docker_db
+          MYSQL_USER=appuser
+          MYSQL_PASSWORD=apppassword
+          SPRING_PROFILES_ACTIVE=prod
+          SERVER_PORT=8080
+          JPA_DDL_AUTO=update
+          JPA_SHOW_SQL=false
+          HIBERNATE_DIALECT=org.hibernate.dialect.MySQLDialect
+          ENVEOF
+          
+          # Run deployment
+          docker-compose down || true
           docker-compose up -d
         EOF
         
