@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # MySQL 데이터베이스 (RDS 사용 시 이 섹션 제거)
+  mysql:
+    image: mysql:8.0
+    container_name: aws_docker_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - aws_docker_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+      interval: 30s
+    restart: always
+
+  # Spring Boot 백엔드
+  backend:
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY_BACKEND}:latest
+    container_name: aws_docker_backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+    networks:
+      - aws_docker_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      timeout: 10s
+      retries: 5
+      interval: 30s
+      start_period: 60s
+    restart: always
+
+  # Nginx 프론트엔드
+  frontend:
+    image: ${ECR_REGISTRY}/${ECR_REPOSITORY_FRONTEND}:latest
+    container_name: aws_docker_frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/ssl:/etc/nginx/ssl:ro  # SSL 인증서 (옵션)
+    networks:
+      - aws_docker_network
+    depends_on:
+      - backend
+    restart: always
+
+  # Redis 캐싱 (프로덕션 환경)
+  redis:
+    image: redis:7-alpine
+    container_name: aws_docker_redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - aws_docker_network
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    restart: always
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  aws_docker_network:
+    driver: bridge
+    name: aws_docker_network

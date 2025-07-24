@@ -1,0 +1,12 @@
+{
+    "name": "Simple Flutter Test",
+    "short_name": "Flutter Test",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0175C2",
+    "theme_color": "#0175C2",
+    "description": "A simple Flutter web test application",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": []
+}

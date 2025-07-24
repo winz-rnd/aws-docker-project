@@ -1,0 +1,26 @@
+name: simple_flutter_test
+description: A simple Flutter web test application
+version: 1.0.0+1
+
+environment:
+  sdk: '>=2.19.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # HTTP 통신
+  http: ^0.13.5
+  
+  # UI 컴포넌트
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # 린트 규칙
+  flutter_lints: ^2.0.3
+
+flutter:
+  uses-material-design: true

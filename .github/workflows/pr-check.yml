@@ -1,0 +1,283 @@
+name: Pull Request Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  check-changes:
+    name: Check what changed
+    runs-on: ubuntu-latest
+    outputs:
+      backend_changed: ${{ steps.changes.outputs.backend }}
+      frontend_changed: ${{ steps.changes.outputs.frontend }}
+      docs_changed: ${{ steps.changes.outputs.docs }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check for changes
+      uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          backend:
+            - 'backend/**'
+          frontend:
+            - 'frontend/**'
+          docs:
+            - 'docs/**'
+            - '*.md'
+
+  backend-check:
+    name: Backend Code Quality Check
+    runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.backend_changed == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('backend/**/*.gradle*', 'backend/**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x backend/gradlew
+
+    - name: Code style check
+      run: |
+        cd backend
+        ./gradlew spotlessCheck || true
+
+    - name: Security scan
+      run: |
+        cd backend
+        ./gradlew dependencyCheckAnalyze || true
+
+    - name: Run tests with coverage
+      run: |
+        cd backend
+        ./gradlew test jacocoTestReport
+
+    - name: Upload test results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Backend Test Results
+        path: backend/build/test-results/test/*.xml
+        reporter: java-junit
+
+    - name: Comment test coverage
+      uses: madrapps/jacoco-report@v1.6.1
+      with:
+        paths: backend/build/reports/jacoco/test/jacocoTestReport.xml
+        token: ${{ secrets.GITHUB_TOKEN }}
+        min-coverage-overall: 70
+        min-coverage-changed-files: 80
+
+  frontend-check:
+    name: Frontend Code Quality Check
+    runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.frontend_changed == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+
+    - name: Get dependencies
+      run: |
+        cd frontend
+        flutter pub get
+
+    - name: Verify dependencies
+      run: |
+        cd frontend
+        flutter pub deps
+
+    - name: Code analysis
+      run: |
+        cd frontend
+        flutter analyze --no-fatal-infos
+
+    - name: Code formatting check
+      run: |
+        cd frontend
+        dart format --set-exit-if-changed .
+
+    - name: Run unit tests
+      run: |
+        cd frontend
+        flutter test --coverage
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+  security-check:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.backend_changed == 'true' || needs.check-changes.outputs.frontend_changed == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Check for sensitive files
+      run: |
+        echo "Checking for sensitive files..."
+        
+        # .env 파일에 실제 값이 있는지 확인
+        if find . -name ".env" -type f -exec grep -l "password\|secret\|key" {} \; 2>/dev/null | grep -v ".env.example"; then
+          echo "❌ Found .env files with potential secrets"
+          exit 1
+        fi
+        
+        # AWS credentials 파일 확인
+        if find . -name "credentials" -o -name "config" | grep -E "(\.aws|credentials)"; then
+          echo "❌ Found AWS credential files"
+          exit 1
+        fi
+        
+        echo "✅ No sensitive files found"
+
+  build-test:
+    name: Build Test
+    runs-on: ubuntu-latest
+    needs: [backend-check, frontend-check]
+    if: always() && !failure() && !cancelled()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Test Backend Docker Build
+      if: needs.check-changes.outputs.backend_changed == 'true'
+      run: |
+        cd backend
+        docker build -t test-backend .
+        echo "✅ Backend Docker build successful"
+
+    - name: Test Frontend Build
+      if: needs.check-changes.outputs.frontend_changed == 'true'
+      run: |
+        cd frontend
+        docker run --rm -v $(pwd):/app -w /app cirrusci/flutter:stable sh -c "
+          flutter pub get &&
+          flutter build web --release
+        "
+        echo "✅ Frontend build successful"
+
+  pr-summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [check-changes, backend-check, frontend-check, security-check, build-test]
+    if: always()
+    
+    steps:
+    - name: Create PR summary
+      run: |
+        cat >> $GITHUB_STEP_SUMMARY << EOF
+        ## 🔍 Pull Request Check Summary
+        
+        ### 📊 Changes Detected
+        - **Backend**: ${{ needs.check-changes.outputs.backend_changed == 'true' && '✅ Changed' || '➖ No changes' }}
+        - **Frontend**: ${{ needs.check-changes.outputs.frontend_changed == 'true' && '✅ Changed' || '➖ No changes' }}
+        - **Documentation**: ${{ needs.check-changes.outputs.docs_changed == 'true' && '✅ Changed' || '➖ No changes' }}
+        
+        ### 🧪 Quality Checks
+        - **Backend Tests**: ${{ needs.backend-check.result == 'success' && '✅ Passed' || needs.backend-check.result == 'skipped' && '➖ Skipped' || '❌ Failed' }}
+        - **Frontend Tests**: ${{ needs.frontend-check.result == 'success' && '✅ Passed' || needs.frontend-check.result == 'skipped' && '➖ Skipped' || '❌ Failed' }}
+        - **Security Scan**: ${{ needs.security-check.result == 'success' && '✅ Passed' || needs.security-check.result == 'skipped' && '➖ Skipped' || '❌ Failed' }}
+        - **Build Test**: ${{ needs.build-test.result == 'success' && '✅ Passed' || needs.build-test.result == 'skipped' && '➖ Skipped' || '❌ Failed' }}
+        
+        ### 🚀 Ready for Merge?
+        ${{ 
+          (needs.backend-check.result == 'success' || needs.backend-check.result == 'skipped') &&
+          (needs.frontend-check.result == 'success' || needs.frontend-check.result == 'skipped') &&
+          (needs.security-check.result == 'success' || needs.security-check.result == 'skipped') &&
+          (needs.build-test.result == 'success' || needs.build-test.result == 'skipped')
+          && '✅ All checks passed! Ready to merge.' 
+          || '❌ Some checks failed. Please review and fix issues before merging.'
+        }}
+        EOF
+
+    - name: Comment on PR
+      uses: actions/github-script@v6
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          const backendStatus = '${{ needs.backend-check.result }}';
+          const frontendStatus = '${{ needs.frontend-check.result }}';
+          const securityStatus = '${{ needs.security-check.result }}';
+          const buildStatus = '${{ needs.build-test.result }}';
+          
+          const getStatusEmoji = (status) => {
+            if (status === 'success') return '✅';
+            if (status === 'skipped') return '➖';
+            return '❌';
+          };
+          
+          const comment = `## 🤖 Automated PR Review
+          
+          | Check | Status | Result |
+          |-------|--------|--------|
+          | Backend Tests | ${getStatusEmoji(backendStatus)} | ${backendStatus} |
+          | Frontend Tests | ${getStatusEmoji(frontendStatus)} | ${frontendStatus} |
+          | Security Scan | ${getStatusEmoji(securityStatus)} | ${securityStatus} |
+          | Build Test | ${getStatusEmoji(buildStatus)} | ${buildStatus} |
+          
+          ${
+            ['success', 'skipped'].includes(backendStatus) &&
+            ['success', 'skipped'].includes(frontendStatus) &&
+            ['success', 'skipped'].includes(securityStatus) &&
+            ['success', 'skipped'].includes(buildStatus)
+            ? '🎉 **All checks passed!** This PR is ready for review and merge.'
+            : '⚠️ **Some checks failed.** Please review the failed checks and fix any issues.'
+          }`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });

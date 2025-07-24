@@ -1,0 +1,75 @@
+# 윈도우 환경용 Docker Compose 설정
+# 사용법: docker-compose -f docker-compose.yml -f docker-compose.windows.yml up
+
+version: '3.8'
+
+services:
+  # MySQL 데이터베이스 (윈도우 최적화)
+  mysql:
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: aws_docker_db
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_windows_data:/var/lib/mysql
+      - ./scripts/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    # 윈도우에서 더 안정적인 설정
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --lower_case_table_names=1
+      --max_connections=100
+      --innodb-buffer-pool-size=128M
+
+  # Spring Boot 백엔드 (윈도우 환경 설정)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_URL: jdbc:mysql://mysql:3306/aws_docker_db?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+      DATABASE_USERNAME: appuser
+      DATABASE_PASSWORD: apppassword
+      DATABASE_DRIVER: com.mysql.cj.jdbc.Driver
+      JPA_DDL_AUTO: update
+      JPA_SHOW_SQL: "true"
+      HIBERNATE_DIALECT: org.hibernate.dialect.MySQLDialect
+      SERVER_PORT: 8080
+      # 윈도우에서 JVM 메모리 최적화
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:+UseG1GC -Dfile.encoding=UTF-8"
+    ports:
+      - "8080:8080"
+    volumes:
+      # 윈도우 경로 스타일
+      - ./logs:/app/logs
+    # 윈도우에서 더 긴 시작 시간 고려
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      timeout: 30s
+      retries: 10
+      interval: 30s
+      start_period: 120s
+
+  # 개발용 phpMyAdmin (윈도우 최적화)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: password
+      PMA_ARBITRARY: 1
+      UPLOAD_LIMIT: 100M
+    ports:
+      - "8081:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_windows_data:
+    driver: local

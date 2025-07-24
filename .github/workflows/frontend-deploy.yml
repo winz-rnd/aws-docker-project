@@ -1,0 +1,227 @@
+name: Frontend Deploy to AWS S3 + CloudFront
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-deploy.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+
+env:
+  AWS_REGION: ap-northeast-2
+  S3_BUCKET: aws-docker-frontend-bucket
+
+jobs:
+  test:
+    name: Run Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+
+    - name: Get dependencies
+      run: |
+        cd frontend
+        flutter pub get
+
+    - name: Analyze code
+      run: |
+        cd frontend
+        flutter analyze
+
+    - name: Run tests
+      run: |
+        cd frontend
+        flutter test
+
+  build-and-deploy:
+    name: Build and Deploy to AWS
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    permissions:
+      id-token: write   # OIDC 토큰 획득을 위해 필요
+      contents: read    # 리포지토리 컨텐츠 읽기
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+
+    - name: Get App Runner service URL
+      id: get-backend-url
+      run: |
+        SERVICE_URL=$(aws apprunner describe-service \
+          --service-arn ${{ secrets.APP_RUNNER_SERVICE_ARN }} \
+          --query 'Service.ServiceUrl' \
+          --output text)
+        echo "backend_url=https://$SERVICE_URL" >> $GITHUB_OUTPUT
+        echo "Backend URL: https://$SERVICE_URL"
+
+    - name: Create production .env file
+      run: |
+        cd frontend
+        cat > .env << EOF
+        API_URL=${{ steps.get-backend-url.outputs.backend_url }}
+        APP_NAME=AWS Docker Frontend
+        APP_VERSION=1.0.0
+        EOF
+        cat .env
+
+    - name: Get dependencies
+      run: |
+        cd frontend
+        flutter pub get
+
+    - name: Build Flutter web
+      run: |
+        cd frontend
+        flutter build web --release --base-href /
+
+    - name: Deploy to S3
+      run: |
+        cd frontend
+        
+        # S3에 파일 동기화
+        aws s3 sync build/web/ s3://${{ env.S3_BUCKET }}/ \
+          --delete \
+          --cache-control "public, max-age=3600" \
+          --exclude "*.html" \
+          --exclude "*.json"
+        
+        # HTML과 JSON 파일은 짧은 캐시 시간 적용
+        aws s3 sync build/web/ s3://${{ env.S3_BUCKET }}/ \
+          --delete \
+          --cache-control "public, max-age=300" \
+          --include "*.html" \
+          --include "*.json"
+
+    - name: Invalidate CloudFront
+      run: |
+        aws cloudfront create-invalidation \
+          --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+          --paths "/*"
+
+    - name: Wait for CloudFront invalidation
+      run: |
+        INVALIDATION_ID=$(aws cloudfront create-invalidation \
+          --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+          --paths "/*" \
+          --query 'Invalidation.Id' \
+          --output text)
+        
+        echo "Invalidation ID: $INVALIDATION_ID"
+        
+        # 무효화 완료까지 대기 (최대 10분)
+        echo "Waiting for CloudFront invalidation to complete..."
+        aws cloudfront wait invalidation-completed \
+          --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+          --id $INVALIDATION_ID
+
+    - name: Get CloudFront URL
+      id: get-frontend-url
+      run: |
+        DISTRIBUTION_URL=$(aws cloudfront get-distribution \
+          --id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+          --query 'Distribution.DomainName' \
+          --output text)
+        echo "frontend_url=https://$DISTRIBUTION_URL" >> $GITHUB_OUTPUT
+        echo "Frontend URL: https://$DISTRIBUTION_URL"
+
+    - name: Health check
+      run: |
+        FRONTEND_URL="${{ steps.get-frontend-url.outputs.frontend_url }}"
+        
+        echo "Testing frontend deployment at: $FRONTEND_URL"
+        
+        # 프론트엔드 접근 테스트 (최대 5분 대기)
+        for i in {1..30}; do
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$FRONTEND_URL")
+          
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Frontend health check passed!"
+            break
+          else
+            echo "Frontend health check failed (HTTP $HTTP_STATUS), retrying in 10 seconds..."
+            sleep 10
+          fi
+          
+          if [ $i -eq 30 ]; then
+            echo "❌ Frontend health check timeout"
+            exit 1
+          fi
+        done
+
+    - name: Test end-to-end connectivity
+      run: |
+        FRONTEND_URL="${{ steps.get-frontend-url.outputs.frontend_url }}"
+        BACKEND_URL="${{ steps.get-backend-url.outputs.backend_url }}"
+        
+        echo "Testing end-to-end connectivity..."
+        echo "Frontend: $FRONTEND_URL"
+        echo "Backend: $BACKEND_URL"
+        
+        # 백엔드 API 테스트
+        echo "Testing backend API..."
+        curl -f "$BACKEND_URL/api/health" | jq .
+        
+        # 백엔드에서 메시지 가져오기 테스트
+        echo "Testing message endpoint..."
+        curl -f "$BACKEND_URL/api/message" | jq .
+
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" = "success" ]; then
+          echo "✅ Frontend deployment successful!"
+          echo "🌐 Frontend URL: ${{ steps.get-frontend-url.outputs.frontend_url }}"
+          echo "🔗 Backend URL: ${{ steps.get-backend-url.outputs.backend_url }}"
+        else
+          echo "❌ Frontend deployment failed!"
+        fi
+
+    - name: Create deployment summary
+      if: success()
+      run: |
+        cat >> $GITHUB_STEP_SUMMARY << EOF
+        ## 🚀 Deployment Successful!
+        
+        ### 📱 Frontend
+        - **URL**: ${{ steps.get-frontend-url.outputs.frontend_url }}
+        - **S3 Bucket**: ${{ env.S3_BUCKET }}
+        - **CloudFront**: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        
+        ### 🔧 Backend
+        - **API URL**: ${{ steps.get-backend-url.outputs.backend_url }}
+        - **Service**: App Runner
+        
+        ### ✅ Health Checks
+        - Frontend: ✅ Accessible
+        - Backend API: ✅ Healthy
+        - End-to-end: ✅ Connected
+        
+        **Test the application**: [Open App](${{ steps.get-frontend-url.outputs.frontend_url }})
+        EOF

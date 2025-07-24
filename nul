@@ -1,0 +1,1 @@
+time="2025-07-24T10:56:36+09:00" level=warning msg="/mnt/f/0.Code/ai-workspace/AWS_Docker/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"

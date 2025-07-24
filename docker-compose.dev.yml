@@ -1,0 +1,65 @@
+# 개발 환경용 Docker Compose 설정
+# 사용법: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  mysql:
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: aws_docker_db
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+      - ./scripts/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder  # 개발용 멀티스테이지 빌드
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_URL: jdbc:mysql://mysql:3306/aws_docker_db?useSSL=false&serverTimezone=Asia/Seoul
+      DATABASE_USERNAME: root
+      DATABASE_PASSWORD: password
+      JPA_DDL_AUTO: update
+      JPA_SHOW_SQL: "true"
+      LOG_LEVEL: DEBUG
+    volumes:
+      - ./backend/src:/app/src:cached
+      - gradle_cache:/home/gradle/.gradle
+    command: >
+      sh -c "
+        ./gradlew bootRun --continuous
+      "
+
+  frontend:
+    image: cirrusci/flutter:stable
+    working_dir: /app
+    environment:
+      API_URL: http://localhost:8080
+    volumes:
+      - ./frontend:/app:cached
+      - flutter_cache:/root/.pub-cache
+    command: >
+      sh -c "
+        flutter pub get &&
+        flutter run -d web-server --web-hostname 0.0.0.0 --web-port 3000 --hot
+      "
+
+  # 개발용 DB 관리 도구
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: password
+    ports:
+      - "8081:80"
+
+volumes:
+  mysql_dev_data:
+  gradle_cache:
+  flutter_cache:
