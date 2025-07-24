@@ -43,7 +43,8 @@ jobs:
     - name: Build Spring Boot application
       run: |
         cd backend
-        ./mvnw clean package -DskipTests
+        chmod +x gradlew
+        ./gradlew clean build -x test
         cd ..
 
     - name: Setup Flutter
