@@ -163,8 +163,11 @@ class DockerArchitecturePainter extends CustomPainter {
     // Client
     _drawClient(canvas, Offset(centerX, 40));
     
-    // Draw connections with animation
-    _drawAnimatedConnections(canvas, size);
+    // Draw static connections
+    _drawStaticConnections(canvas, size);
+    
+    // Draw moving dots
+    _drawMovingDots(canvas, size);
     
     // Labels
     _drawLabels(canvas, size);
@@ -251,10 +254,10 @@ class DockerArchitecturePainter extends CustomPainter {
       ..color = Colors.green
       ..style = PaintingStyle.fill;
     
-    // Monitor
+    // Monitor (smaller)
     final monitorRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: center, width: 40, height: 30),
-      const Radius.circular(4),
+      Rect.fromCenter(center: center, width: 30, height: 22),
+      const Radius.circular(3),
     );
     canvas.drawRRect(monitorRect, paint);
     
@@ -264,18 +267,18 @@ class DockerArchitecturePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     
     final screenRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: center, width: 34, height: 24),
+      Rect.fromCenter(center: center, width: 26, height: 18),
       const Radius.circular(2),
     );
     canvas.drawRRect(screenRect, screenPaint);
     
     // Stand
     canvas.drawRect(
-      Rect.fromCenter(center: center.translate(0, 18), width: 15, height: 5),
+      Rect.fromCenter(center: center.translate(0, 13), width: 12, height: 4),
       paint,
     );
     
-    _drawLabel(canvas, 'Client Browser', center.translate(0, 30));
+    _drawLabel(canvas, 'Client Browser', center.translate(0, 35));
   }
 
   void _drawNginxContainer(Canvas canvas, Offset center) {
@@ -335,10 +338,10 @@ class DockerArchitecturePainter extends CustomPainter {
     canvas.scale(scale);
     canvas.translate(-center.dx, -center.dy);
     
-    // Container background
+    // Container background (smaller)
     final containerRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: center, width: 80, height: 60),
-      const Radius.circular(8),
+      Rect.fromCenter(center: center, width: 65, height: 50),
+      const Radius.circular(6),
     );
     
     final containerPaint = Paint()
@@ -353,15 +356,15 @@ class DockerArchitecturePainter extends CustomPainter {
     canvas.drawRRect(containerRect, containerPaint);
     canvas.drawRRect(containerRect, borderPaint);
     
-    // Docker logo
+    // Docker logo (smaller)
     final dockerPaint = Paint()
       ..color = Colors.blue[700]!
       ..style = PaintingStyle.fill;
     
     final dockerRect = Rect.fromCenter(
-      center: center.translate(25, -20),
-      width: 20,
-      height: 15,
+      center: center.translate(20, -15),
+      width: 15,
+      height: 12,
     );
     canvas.drawRect(dockerRect, dockerPaint);
     
@@ -398,97 +401,66 @@ class DockerArchitecturePainter extends CustomPainter {
       center.translate(-iconPainter.width / 2, -iconPainter.height / 2),
     );
     
-    // Label
-    _drawLabel(canvas, label, center.translate(0, 40), fontSize: 10);
+    // Label (moved further down)
+    _drawLabel(canvas, label, center.translate(0, 45), fontSize: 10);
   }
 
-  void _drawAnimatedConnections(Canvas canvas, Size size) {
+  void _drawStaticConnections(Canvas canvas, Size size) {
     final centerX = size.width / 2;
     final centerY = size.height / 2;
     
     final connections = [
       // Client to nginx
-      AnimatedConnection(
-        start: Offset(centerX, 70),
-        end: Offset(centerX - 120, centerY - 30),
-        color: Colors.green,
-      ),
+      [Offset(centerX, 70), Offset(centerX - 120, centerY - 30)],
       // nginx to Flutter
-      AnimatedConnection(
-        start: Offset(centerX - 80, centerY),
-        end: Offset(centerX - 40, centerY),
-        color: Colors.blue,
-      ),
+      [Offset(centerX - 80, centerY), Offset(centerX - 40, centerY)],
       // Flutter to Spring Boot
-      AnimatedConnection(
-        start: Offset(centerX + 40, centerY),
-        end: Offset(centerX + 80, centerY),
-        color: Colors.orange,
-      ),
+      [Offset(centerX + 40, centerY), Offset(centerX + 80, centerY)],
       // Spring Boot to MySQL
-      AnimatedConnection(
-        start: Offset(centerX + 120, centerY + 30),
-        end: Offset(centerX + 40, centerY + 100),
-        color: Colors.purple,
-      ),
+      [Offset(centerX + 120, centerY + 30), Offset(centerX + 40, centerY + 100)],
     ];
     
-    for (final connection in connections) {
-      _drawAnimatedArrow(
-        canvas,
-        connection.start,
-        connection.end,
-        connection.color,
-        flowAnimation.value,
-      );
-    }
-  }
-
-  void _drawAnimatedArrow(
-    Canvas canvas,
-    Offset start,
-    Offset end,
-    Color color,
-    double progress,
-  ) {
-    final path = Path()
-      ..moveTo(start.dx, start.dy)
-      ..lineTo(end.dx, end.dy);
-    
-    // Background line
-    final bgPaint = Paint()
-      ..color = color.withOpacity(0.3)
+    final paint = Paint()
+      ..color = Colors.grey.withOpacity(0.3)
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
     
-    canvas.drawPath(path, bgPaint);
+    for (final connection in connections) {
+      canvas.drawLine(connection[0], connection[1], paint);
+    }
+  }
+
+  void _drawMovingDots(Canvas canvas, Size size) {
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
     
-    // Animated line
-    final animPaint = Paint()
-      ..color = color
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
+    final paths = [
+      // Client to nginx
+      [Offset(centerX, 70), Offset(centerX - 120, centerY - 30), Colors.green],
+      // nginx to Flutter
+      [Offset(centerX - 80, centerY), Offset(centerX - 40, centerY), Colors.blue],
+      // Flutter to Spring Boot
+      [Offset(centerX + 40, centerY), Offset(centerX + 80, centerY), Colors.orange],
+      // Spring Boot to MySQL
+      [Offset(centerX + 120, centerY + 30), Offset(centerX + 40, centerY + 100), Colors.purple],
+    ];
     
-    final metrics = path.computeMetrics().first;
-    final extractPath = metrics.extractPath(0, metrics.length * progress);
-    
-    canvas.drawPath(extractPath, animPaint);
-    
-    // Arrow head
-    if (progress > 0.1) {
-      final tangent = metrics.getTangentForOffset(metrics.length * progress);
-      if (tangent != null) {
-        canvas.save();
-        canvas.translate(tangent.position.dx, tangent.position.dy);
-        canvas.rotate(tangent.angle);
+    for (int i = 0; i < paths.length; i++) {
+      final start = paths[i][0] as Offset;
+      final end = paths[i][1] as Offset;
+      final color = paths[i][2] as Color;
+      
+      // Calculate multiple dots along the path
+      for (int j = 0; j < 3; j++) {
+        final progress = (flowAnimation.value + j * 0.33) % 1.0;
+        final x = start.dx + (end.dx - start.dx) * progress;
+        final y = start.dy + (end.dy - start.dy) * progress;
         
-        final arrowPath = Path()
-          ..moveTo(-8, -4)
-          ..lineTo(0, 0)
-          ..lineTo(-8, 4);
+        final dotPaint = Paint()
+          ..color = color
+          ..style = PaintingStyle.fill;
         
-        canvas.drawPath(arrowPath, animPaint);
-        canvas.restore();
+        canvas.drawCircle(Offset(x, y), 4, dotPaint);
       }
     }
   }
