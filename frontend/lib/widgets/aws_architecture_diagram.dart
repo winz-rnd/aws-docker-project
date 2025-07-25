@@ -15,7 +15,6 @@ class _AwsArchitectureDiagramState extends State<AwsArchitectureDiagram>
   late AnimationController _pulseController;
   late Animation<double> _flowAnimation;
   late Animation<double> _pulseAnimation;
-  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
@@ -44,14 +43,6 @@ class _AwsArchitectureDiagramState extends State<AwsArchitectureDiagram>
     _pulseAnimation = Tween<double>(
       begin: 1.0,
       end: 1.2,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _scaleAnimation = Tween<double>(
-      begin: 0.95,
-      end: 1.05,
     ).animate(CurvedAnimation(
       parent: _pulseController,
       curve: Curves.easeInOut,

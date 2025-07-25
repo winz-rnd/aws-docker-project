@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import '../theme/app_theme.dart';
 
 class CICDArchitectureDiagram extends StatefulWidget {
