@@ -74,23 +74,8 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Create build_output directory and copy Flutter build output
-        mkdir -p frontend/build_output
-        cp -r frontend/build/web/* frontend/build_output/
-        
-        # Create Dockerfile for frontend
-        cat > frontend/Dockerfile.production << EOF
-        FROM nginx:alpine
-        COPY build_output /usr/share/nginx/html
-        COPY nginx.conf /etc/nginx/conf.d/default.conf
-        EXPOSE 80
-        CMD ["nginx", "-g", "daemon off;"]
-        EOF
-        
-        # Copy nginx config to frontend directory
-        cp nginx/nginx.conf frontend/nginx.conf
-        
-        docker build -f frontend/Dockerfile.production -t $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest ./frontend
+        # Build frontend Docker image with the new Dockerfile
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest ./frontend
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest
 
@@ -150,9 +135,18 @@ jobs:
           HIBERNATE_DIALECT=org.hibernate.dialect.MySQLDialect
           ENVEOF
           
-          # Run deployment
-          docker-compose down || true
-          docker-compose up -d
+          # Login to ECR
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+          
+          # Create ECR registry environment variables
+          export ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          export ECR_REPOSITORY_BACKEND=${{ env.ECR_REPOSITORY_BACKEND }}
+          export ECR_REPOSITORY_FRONTEND=${{ env.ECR_REPOSITORY_FRONTEND }}
+          
+          # Run deployment with production compose file
+          docker-compose -f docker-compose.production.yml down || true
+          docker-compose -f docker-compose.production.yml pull
+          docker-compose -f docker-compose.production.yml up -d
         EOF
         
         # Clean up

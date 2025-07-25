@@ -1,0 +1,31 @@
+name: Check Deployment Status
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'  # 30분마다 실행
+
+jobs:
+  check-status:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check EC2 Deployment Status
+      env:
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USER: ${{ secrets.EC2_USER }}
+        EC2_KEY: ${{ secrets.EC2_SSH_KEY }}
+      run: |
+        echo "$EC2_KEY" > ec2-key.pem
+        chmod 600 ec2-key.pem
+        
+        echo "=== Docker Container Status ==="
+        ssh -o StrictHostKeyChecking=no -i ec2-key.pem $EC2_USER@$EC2_HOST "docker ps"
+        
+        echo -e "\n=== Backend Health Check ==="
+        curl -f http://$EC2_HOST:8080/api/health || echo "Backend is not responding"
+        
+        echo -e "\n=== Recent Backend Logs ==="
+        ssh -o StrictHostKeyChecking=no -i ec2-key.pem $EC2_USER@$EC2_HOST "docker logs --tail 20 aws_docker_backend"
+        
+        rm -f ec2-key.pem
