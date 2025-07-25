@@ -11,28 +11,40 @@ class CICDArchitectureDiagram extends StatefulWidget {
 
 class _CICDArchitectureDiagramState extends State<CICDArchitectureDiagram>
     with TickerProviderStateMixin {
-  late AnimationController _flowController;
+  late AnimationController _sequenceController;
   late AnimationController _pulseController;
-  late Animation<double> _flowAnimation;
+  late Animation<double> _sequenceAnimation;
   late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
     
-    // 데이터 플로우 애니메이션
-    _flowController = AnimationController(
-      duration: const Duration(seconds: 3),
+    // 순차적 애니메이션 컨트롤러 (8초 사이클: 6초 진행 + 2초 대기)
+    _sequenceController = AnimationController(
+      duration: const Duration(seconds: 8),
       vsync: this,
-    )..repeat();
+    );
     
-    _flowAnimation = Tween<double>(
+    _sequenceAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _flowController,
-      curve: Curves.easeInOut,
+      parent: _sequenceController,
+      curve: const Interval(0.0, 0.75, curve: Curves.easeInOut), // 75%만 애니메이션, 25% 대기
     ));
+    
+    // 애니메이션 반복
+    _sequenceController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _sequenceController.reset();
+          _sequenceController.forward();
+        });
+      }
+    });
+    
+    _sequenceController.forward();
     
     // 펄스 애니메이션
     _pulseController = AnimationController(
@@ -51,7 +63,7 @@ class _CICDArchitectureDiagramState extends State<CICDArchitectureDiagram>
 
   @override
   void dispose() {
-    _flowController.dispose();
+    _sequenceController.dispose();
     _pulseController.dispose();
     super.dispose();
   }
@@ -73,12 +85,17 @@ class _CICDArchitectureDiagramState extends State<CICDArchitectureDiagram>
           ),
           const SizedBox(height: 20),
           Expanded(
-            child: CustomPaint(
-              painter: CICDPainter(
-                flowAnimation: _flowAnimation,
-                pulseAnimation: _pulseAnimation,
-              ),
-              child: Container(),
+            child: AnimatedBuilder(
+              animation: _sequenceAnimation,
+              builder: (context, child) {
+                return CustomPaint(
+                  painter: CICDPainter(
+                    sequenceProgress: _sequenceAnimation.value,
+                    pulseAnimation: _pulseAnimation,
+                  ),
+                  child: Container(),
+                );
+              },
             ),
           ),
           const SizedBox(height: 20),
@@ -129,44 +146,87 @@ class _CICDArchitectureDiagramState extends State<CICDArchitectureDiagram>
 }
 
 class CICDPainter extends CustomPainter {
-  final Animation<double> flowAnimation;
+  final double sequenceProgress;
   final Animation<double> pulseAnimation;
 
   CICDPainter({
-    required this.flowAnimation,
+    required this.sequenceProgress,
     required this.pulseAnimation,
-  }) : super(repaint: Listenable.merge([flowAnimation, pulseAnimation]));
+  }) : super(repaint: pulseAnimation);
 
   @override
   void paint(Canvas canvas, Size size) {
     final centerX = size.width / 2;
     final rowHeight = size.height / 8;
+    
+    // 각 단계의 타이밍 (0.0 ~ 1.0)
+    const stageCount = 7;
+    const stageDuration = 1.0 / stageCount;
+    
+    // 각 단계별 진행도 계산
+    double getStageOpacity(int stage) {
+      final stageStart = stage * stageDuration;
+      final stageEnd = stageStart + stageDuration;
+      
+      if (sequenceProgress < stageStart) return 0.0;
+      if (sequenceProgress > stageEnd) return 1.0;
+      
+      return (sequenceProgress - stageStart) / stageDuration;
+    }
 
-    // Vertical layout - top to bottom
-    // 1. Developer
-    _drawDeveloper(canvas, Offset(centerX, rowHeight * 0.8));
+    // Vertical layout - top to bottom with sequential animation
+    // 1. Developer (stage 0)
+    if (getStageOpacity(0) > 0) {
+      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(0)));
+      _drawDeveloper(canvas, Offset(centerX, rowHeight * 0.8));
+      canvas.restore();
+    }
     
-    // 2. GitHub Repository
-    _drawGitHub(canvas, Offset(centerX, rowHeight * 1.8));
+    // 2. GitHub Repository (stage 1)
+    if (getStageOpacity(1) > 0) {
+      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(1)));
+      _drawGitHub(canvas, Offset(centerX, rowHeight * 1.8));
+      canvas.restore();
+    }
     
-    // 3. GitHub Actions
-    _drawGitHubActions(canvas, Offset(centerX, rowHeight * 2.8));
+    // 3. GitHub Actions (stage 2)
+    if (getStageOpacity(2) > 0) {
+      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(2)));
+      _drawGitHubActions(canvas, Offset(centerX, rowHeight * 2.8));
+      canvas.restore();
+    }
     
-    // 4. Docker Build
-    _drawDockerBuild(canvas, Offset(centerX, rowHeight * 3.8));
+    // 4. Docker Build (stage 3)
+    if (getStageOpacity(3) > 0) {
+      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(3)));
+      _drawDockerBuild(canvas, Offset(centerX, rowHeight * 3.8));
+      canvas.restore();
+    }
     
-    // 5. AWS Services (ECR and IAM side by side)
-    _drawECR(canvas, Offset(centerX - 80, rowHeight * 4.8));
-    _drawIAM(canvas, Offset(centerX + 80, rowHeight * 4.8));
+    // 5. AWS Services (ECR and IAM side by side) (stage 4)
+    if (getStageOpacity(4) > 0) {
+      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(4)));
+      _drawECR(canvas, Offset(centerX - 80, rowHeight * 4.8));
+      _drawIAM(canvas, Offset(centerX + 80, rowHeight * 4.8));
+      canvas.restore();
+    }
     
-    // 6. EC2 Instance
-    _drawEC2(canvas, Offset(centerX, rowHeight * 5.8));
+    // 6. EC2 Instance (stage 5)
+    if (getStageOpacity(5) > 0) {
+      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(5)));
+      _drawEC2(canvas, Offset(centerX, rowHeight * 5.8));
+      canvas.restore();
+    }
     
-    // 7. Docker Containers
-    _drawDockerContainers(canvas, Offset(centerX, rowHeight * 6.8));
+    // 7. Docker Containers (stage 6)
+    if (getStageOpacity(6) > 0) {
+      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(6)));
+      _drawDockerContainers(canvas, Offset(centerX, rowHeight * 6.8));
+      canvas.restore();
+    }
     
-    // Draw connections with flow animation
-    _drawAnimatedConnections(canvas, size);
+    // Draw connections with sequential animation
+    _drawSequentialConnections(canvas, size, getStageOpacity);
     
     // Draw labels
     _drawLabels(canvas, size);
@@ -435,58 +495,64 @@ class CICDPainter extends CustomPainter {
     _drawLabel(canvas, 'Docker Containers', center.translate(0, 50));
   }
 
-  void _drawAnimatedConnections(Canvas canvas, Size size) {
-    final dashPaint = Paint()
-      ..color = AppTheme.awsOrange.withOpacity(0.3)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-    
-    final animatedPaint = Paint()
-      ..color = AppTheme.awsOrange
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
-    
+  void _drawSequentialConnections(Canvas canvas, Size size, Function getStageOpacity) {
     final centerX = size.width / 2;
     final rowHeight = size.height / 8;
     
-    // Vertical connection paths
+    // 연결선 정의 (각 연결선이 어느 단계에 속하는지)
     final connections = [
-      // Developer to GitHub
-      [Offset(centerX, rowHeight * 1.1), Offset(centerX, rowHeight * 1.5)],
-      // GitHub to Actions
-      [Offset(centerX, rowHeight * 2.1), Offset(centerX, rowHeight * 2.5)],
-      // Actions to Docker Build
-      [Offset(centerX, rowHeight * 3.1), Offset(centerX, rowHeight * 3.5)],
-      // Docker Build to ECR/IAM (split)
-      [Offset(centerX, rowHeight * 4.1), Offset(centerX - 80, rowHeight * 4.5)],
-      [Offset(centerX, rowHeight * 4.1), Offset(centerX + 80, rowHeight * 4.5)],
-      // ECR/IAM to EC2 (merge)
-      [Offset(centerX - 80, rowHeight * 5.1), Offset(centerX, rowHeight * 5.5)],
-      [Offset(centerX + 80, rowHeight * 5.1), Offset(centerX, rowHeight * 5.5)],
-      // EC2 to Containers
-      [Offset(centerX, rowHeight * 6.1), Offset(centerX, rowHeight * 6.5)],
+      // Stage 0 -> 1: Developer to GitHub
+      {'stage': 1, 'start': Offset(centerX, rowHeight * 1.1), 'end': Offset(centerX, rowHeight * 1.5)},
+      // Stage 1 -> 2: GitHub to Actions
+      {'stage': 2, 'start': Offset(centerX, rowHeight * 2.1), 'end': Offset(centerX, rowHeight * 2.5)},
+      // Stage 2 -> 3: Actions to Docker Build
+      {'stage': 3, 'start': Offset(centerX, rowHeight * 3.1), 'end': Offset(centerX, rowHeight * 3.5)},
+      // Stage 3 -> 4: Docker Build to ECR/IAM (split)
+      {'stage': 4, 'start': Offset(centerX, rowHeight * 4.1), 'end': Offset(centerX - 80, rowHeight * 4.5)},
+      {'stage': 4, 'start': Offset(centerX, rowHeight * 4.1), 'end': Offset(centerX + 80, rowHeight * 4.5)},
+      // Stage 4 -> 5: ECR/IAM to EC2 (merge)
+      {'stage': 5, 'start': Offset(centerX - 80, rowHeight * 5.1), 'end': Offset(centerX, rowHeight * 5.5)},
+      {'stage': 5, 'start': Offset(centerX + 80, rowHeight * 5.1), 'end': Offset(centerX, rowHeight * 5.5)},
+      // Stage 5 -> 6: EC2 to Containers
+      {'stage': 6, 'start': Offset(centerX, rowHeight * 6.1), 'end': Offset(centerX, rowHeight * 6.5)},
     ];
     
     for (final connection in connections) {
-      final path = Path()
-        ..moveTo(connection[0].dx, connection[0].dy)
-        ..lineTo(connection[1].dx, connection[1].dy);
+      final stage = connection['stage'] as int;
+      final start = connection['start'] as Offset;
+      final end = connection['end'] as Offset;
+      final opacity = getStageOpacity(stage);
       
-      // Draw dashed background
-      _drawDashedPath(canvas, path, dashPaint);
-      
-      // Draw animated flow
-      final progress = flowAnimation.value;
-      final metrics = path.computeMetrics().first;
-      final extractPath = metrics.extractPath(0, metrics.length * progress);
-      
-      canvas.drawPath(extractPath, animatedPaint);
-      
-      // Draw arrow at the end of animated path
-      if (progress > 0.1) {
-        final tangent = metrics.getTangentForOffset(metrics.length * progress);
-        if (tangent != null) {
-          _drawArrow(canvas, tangent.position, tangent.angle, animatedPaint);
+      if (opacity > 0) {
+        final path = Path()
+          ..moveTo(start.dx, start.dy)
+          ..lineTo(end.dx, end.dy);
+        
+        // 배경 점선
+        final dashPaint = Paint()
+          ..color = AppTheme.awsOrange.withOpacity(0.2 * opacity)
+          ..strokeWidth = 2
+          ..style = PaintingStyle.stroke;
+        
+        _drawDashedPath(canvas, path, dashPaint);
+        
+        // 애니메이션 선
+        final animPaint = Paint()
+          ..color = AppTheme.awsOrange.withOpacity(opacity)
+          ..strokeWidth = 3
+          ..style = PaintingStyle.stroke;
+        
+        final metrics = path.computeMetrics().first;
+        final extractPath = metrics.extractPath(0, metrics.length * opacity);
+        
+        canvas.drawPath(extractPath, animPaint);
+        
+        // 화살표
+        if (opacity > 0.5) {
+          final tangent = metrics.getTangentForOffset(metrics.length * opacity);
+          if (tangent != null) {
+            _drawArrow(canvas, tangent.position, tangent.angle, animPaint);
+          }
         }
       }
     }
