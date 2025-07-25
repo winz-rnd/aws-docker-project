@@ -12,12 +12,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Simple Flutter Test',
+      title: 'Flutter + Spring Boot + MySQL',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Flutter + Spring Boot + MySQL'),
     );
   }
 }
@@ -35,6 +35,12 @@ class _MyHomePageState extends State<MyHomePage> {
   String _message = 'Press the button to get a message';
   bool _isLoading = false;
   final TextEditingController _textController = TextEditingController();
+  
+  // API base URL - use relative path for production
+  String get apiBaseUrl {
+    // In production, use relative path so nginx can proxy
+    return '/api';
+  }
 
   Future<void> _fetchMessage() async {
     setState(() {
@@ -43,7 +49,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:8081/api/message'),
+        Uri.parse('$apiBaseUrl/message'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -82,7 +88,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://localhost:8081/api/message'),
+        Uri.parse('$apiBaseUrl/message'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'content': _textController.text.trim()}),
       );
