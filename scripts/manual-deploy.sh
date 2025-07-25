@@ -1,0 +1,43 @@
+#!/bin/bash
+# EC2 수동 배포 스크립트
+
+EC2_HOST="13.209.88.100"
+EC2_USER="ubuntu"
+KEY_PATH="./etc/ec2_AWS_test.pem"
+
+echo "=== EC2 수동 배포 시작 ==="
+echo ""
+
+# SSH 명령어 표시
+echo "다음 명령어를 실행하여 EC2에 접속하세요:"
+echo "ssh -i $KEY_PATH $EC2_USER@$EC2_HOST"
+echo ""
+
+echo "EC2에 접속한 후 다음 명령어들을 순서대로 실행하세요:"
+echo ""
+echo "# 1. 프로젝트 디렉토리로 이동"
+echo "cd /home/ubuntu/aws-docker"
+echo ""
+echo "# 2. 최신 코드 가져오기"
+echo "git pull origin main"
+echo ""
+echo "# 3. ECR 로그인"
+echo "aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin 381491973816.dkr.ecr.ap-northeast-2.amazonaws.com"
+echo ""
+echo "# 4. Docker Compose 중지"
+echo "docker-compose -f docker-compose.production.yml down"
+echo ""
+echo "# 5. 최신 이미지 가져오기"
+echo "export ECR_REGISTRY=381491973816.dkr.ecr.ap-northeast-2.amazonaws.com"
+echo "export ECR_REPOSITORY_BACKEND=aws-docker-backend"
+echo "export ECR_REPOSITORY_FRONTEND=aws-docker-frontend"
+echo "docker-compose -f docker-compose.production.yml pull"
+echo ""
+echo "# 6. 컨테이너 재시작"
+echo "docker-compose -f docker-compose.production.yml up -d"
+echo ""
+echo "# 7. 상태 확인"
+echo "docker ps"
+echo ""
+echo "# 8. Frontend 컨테이너 내부 확인"
+echo "docker exec aws_docker_frontend ls -la /usr/share/nginx/html/"

@@ -131,4 +131,4 @@ CLOUDFRONT_DISTRIBUTION_ID=XXXXXXXXXX
 ## 라이센스
 
 MIT License
-# Trigger new deployment - EC2 Host updated to 13.209.88.100
+# Trigger new deployment - Flutter app ready
