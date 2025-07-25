@@ -228,10 +228,6 @@ class ConnectionPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppTheme.awsOrange
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke;
 
     final dashPaint = Paint()
       ..color = AppTheme.awsOrange.withOpacity(0.3)

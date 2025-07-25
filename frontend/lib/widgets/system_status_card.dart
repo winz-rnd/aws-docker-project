@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shimmer/shimmer.dart';
 import '../theme/app_theme.dart';
 
 class SystemStatusCard extends StatelessWidget {
@@ -89,15 +88,17 @@ class SystemStatusCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               if (isLoading)
-                Shimmer.fromColors(
-                  baseColor: Colors.grey[300]!,
-                  highlightColor: Colors.grey[100]!,
-                  child: Container(
-                    height: 20,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
+                Container(
+                  height: 20,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: LinearProgressIndicator(
+                    backgroundColor: Colors.grey[300],
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isConnected ? AppTheme.successGreen : AppTheme.awsOrange,
                     ),
                   ),
                 )
