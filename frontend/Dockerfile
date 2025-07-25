@@ -18,7 +18,12 @@ RUN curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable
     && rm flutter.tar.xz
 
 ENV PATH="/opt/flutter/bin:/opt/flutter/bin/cache/dart-sdk/bin:${PATH}"
-RUN flutter doctor -v && flutter config --enable-web
+
+# Flutter 초기화 및 웹 활성화
+RUN flutter --version && \
+    flutter doctor -v && \
+    flutter config --enable-web && \
+    flutter precache --web
 
 # Copy source code
 WORKDIR /app

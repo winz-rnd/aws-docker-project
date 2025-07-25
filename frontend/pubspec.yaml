@@ -3,27 +3,21 @@ description: AWS Full Stack Demo with Flutter, Spring Boot, and MySQL
 version: 1.0.0+1
 
 environment:
-  sdk: '>=2.19.0 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
   
   # HTTP 통신
-  http: ^0.13.5
+  http: ^1.1.0
   
   # UI 컴포넌트
-  cupertino_icons: ^1.0.2
+  cupertino_icons: ^1.0.6
   
   # 애니메이션 및 UI 개선
   animated_text_kit: ^4.2.2  # 텍스트 애니메이션
-  lottie: ^2.6.0            # Lottie 애니메이션
-  fl_chart: ^0.63.0         # 차트 및 다이어그램
   shimmer: ^3.0.0           # 로딩 효과
-  
-  # 상태 관리 및 유틸리티
-  provider: ^6.0.5          # 상태 관리
-  intl: ^0.18.1            # 국제화 및 날짜 포맷
 
 dev_dependencies:
   flutter_test:
