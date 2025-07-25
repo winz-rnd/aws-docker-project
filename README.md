@@ -131,4 +131,4 @@ CLOUDFRONT_DISTRIBUTION_ID=XXXXXXXXXX
 ## 라이센스
 
 MIT License
-# Trigger new deployment
+# Trigger new deployment - EC2 Host updated to 13.209.88.100
