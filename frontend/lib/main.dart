@@ -5,6 +5,7 @@ import 'dart:async';
 import 'theme/app_theme.dart';
 import 'widgets/system_status_card.dart';
 import 'widgets/aws_architecture_diagram.dart';
+import 'widgets/cicd_architecture_diagram.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
 
 void main() {
@@ -272,6 +273,17 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const AwsArchitectureDiagram(),
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // CI/CD 파이프라인 다이어그램
+                      Card(
+                        elevation: 8,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const CICDArchitectureDiagram(),
                       ),
                       
                       const SizedBox(height: 20),
