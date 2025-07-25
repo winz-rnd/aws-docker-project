@@ -71,7 +71,7 @@ class _CICDArchitectureDiagramState extends State<CICDArchitectureDiagram>
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 800,
+      height: 900,
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
@@ -157,7 +157,7 @@ class CICDPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final centerX = size.width / 2;
-    final rowHeight = size.height / 8;
+    final spacing = size.height / 7;  // 더 넓은 간격
     
     // 각 단계의 타이밍 (0.0 ~ 1.0)
     const stageCount = 7;
@@ -174,62 +174,69 @@ class CICDPainter extends CustomPainter {
       return (sequenceProgress - stageStart) / stageDuration;
     }
 
-    // Vertical layout - top to bottom with sequential animation
-    // 1. Developer (stage 0)
-    if (getStageOpacity(0) > 0) {
-      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(0)));
-      _drawDeveloper(canvas, Offset(centerX, rowHeight * 0.8));
-      canvas.restore();
-    }
+    // 위치 계산
+    final positions = [
+      Offset(centerX, spacing * 0.7),      // Developer
+      Offset(centerX, spacing * 1.5),      // GitHub
+      Offset(centerX, spacing * 2.3),      // GitHub Actions
+      Offset(centerX, spacing * 3.1),      // Docker Build
+      Offset(centerX, spacing * 3.9),      // ECR/IAM
+      Offset(centerX, spacing * 4.7),      // EC2
+      Offset(centerX, spacing * 5.5),      // Docker Containers
+    ];
+
+    // 1. Developer
+    _drawWithOpacity(canvas, () {
+      _drawDeveloper(canvas, positions[0]);
+    }, getStageOpacity(0));
     
-    // 2. GitHub Repository (stage 1)
-    if (getStageOpacity(1) > 0) {
-      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(1)));
-      _drawGitHub(canvas, Offset(centerX, rowHeight * 1.8));
-      canvas.restore();
-    }
+    // 2. GitHub Repository
+    _drawWithOpacity(canvas, () {
+      _drawGitHub(canvas, positions[1]);
+    }, getStageOpacity(1));
     
-    // 3. GitHub Actions (stage 2)
-    if (getStageOpacity(2) > 0) {
-      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(2)));
-      _drawGitHubActions(canvas, Offset(centerX, rowHeight * 2.8));
-      canvas.restore();
-    }
+    // 3. GitHub Actions
+    _drawWithOpacity(canvas, () {
+      _drawGitHubActions(canvas, positions[2]);
+    }, getStageOpacity(2));
     
-    // 4. Docker Build (stage 3)
-    if (getStageOpacity(3) > 0) {
-      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(3)));
-      _drawDockerBuild(canvas, Offset(centerX, rowHeight * 3.8));
-      canvas.restore();
-    }
+    // 4. Docker Build
+    _drawWithOpacity(canvas, () {
+      _drawDockerBuild(canvas, positions[3]);
+    }, getStageOpacity(3));
     
-    // 5. AWS Services (ECR and IAM side by side) (stage 4)
-    if (getStageOpacity(4) > 0) {
-      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(4)));
-      _drawECR(canvas, Offset(centerX - 80, rowHeight * 4.8));
-      _drawIAM(canvas, Offset(centerX + 80, rowHeight * 4.8));
-      canvas.restore();
-    }
+    // 5. AWS Services (ECR and IAM)
+    _drawWithOpacity(canvas, () {
+      _drawECR(canvas, Offset(centerX - 100, positions[4].dy));
+      _drawIAM(canvas, Offset(centerX + 100, positions[4].dy));
+    }, getStageOpacity(4));
     
-    // 6. EC2 Instance (stage 5)
-    if (getStageOpacity(5) > 0) {
-      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(5)));
-      _drawEC2(canvas, Offset(centerX, rowHeight * 5.8));
-      canvas.restore();
-    }
+    // 6. EC2 Instance
+    _drawWithOpacity(canvas, () {
+      _drawEC2(canvas, positions[5]);
+    }, getStageOpacity(5));
     
-    // 7. Docker Containers (stage 6)
-    if (getStageOpacity(6) > 0) {
-      canvas.saveLayer(Rect.largest, Paint()..color = Colors.white.withOpacity(getStageOpacity(6)));
-      _drawDockerContainers(canvas, Offset(centerX, rowHeight * 6.8));
-      canvas.restore();
-    }
+    // 7. Docker Containers
+    _drawWithOpacity(canvas, () {
+      _drawDockerContainers(canvas, positions[6]);
+    }, getStageOpacity(6));
     
-    // Draw connections with sequential animation
-    _drawSequentialConnections(canvas, size, getStageOpacity);
+    // Draw connections
+    _drawSequentialConnections(canvas, positions, getStageOpacity);
     
     // Draw labels
-    _drawLabels(canvas, size);
+    _drawLabels(canvas, positions);
+  }
+
+  void _drawWithOpacity(Canvas canvas, VoidCallback draw, double opacity) {
+    if (opacity <= 0) return;
+    
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(opacity);
+    
+    canvas.saveLayer(null, paint);
+    draw();
+    canvas.restore();
   }
 
   void _drawDeveloper(Canvas canvas, Offset center) {
@@ -237,7 +244,7 @@ class CICDPainter extends CustomPainter {
       ..color = Colors.green
       ..style = PaintingStyle.fill;
     
-    // Developer icon (simplified person)
+    // Developer icon
     canvas.drawCircle(center.translate(0, -15), 10, paint);
     
     final path = Path()
@@ -259,14 +266,12 @@ class CICDPainter extends CustomPainter {
       ..color = Colors.black87
       ..style = PaintingStyle.fill;
     
-    // GitHub logo (simplified)
     canvas.drawCircle(center, 25, paint);
     
     final whitePaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
     
-    // Octocat shape (simplified)
     canvas.drawCircle(center, 18, whitePaint);
     
     _drawLabel(canvas, 'GitHub\nRepository', center.translate(0, 40));
@@ -284,7 +289,6 @@ class CICDPainter extends CustomPainter {
     
     canvas.drawRRect(rect, paint);
     
-    // Actions icon
     final iconPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
@@ -309,28 +313,15 @@ class CICDPainter extends CustomPainter {
     
     canvas.drawRRect(rect, paint);
     
-    // Docker whale icon (simplified)
     final whalePaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
     
-    // Whale body
     final whaleBody = RRect.fromRectAndRadius(
       Rect.fromCenter(center: center, width: 40, height: 25),
       const Radius.circular(10),
     );
     canvas.drawRRect(whaleBody, whalePaint);
-    
-    // Containers on whale
-    for (int i = 0; i < 3; i++) {
-      final containerRect = Rect.fromLTWH(
-        center.dx - 15 + i * 10,
-        center.dy - 12,
-        8,
-        8,
-      );
-      canvas.drawRect(containerRect, Paint()..color = Colors.blue[700]!);
-    }
     
     _drawLabel(canvas, 'Docker\nBuild', center.translate(0, 45));
   }
@@ -347,7 +338,6 @@ class CICDPainter extends CustomPainter {
     
     canvas.drawRRect(rect, paint);
     
-    // Container icon
     final iconPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
@@ -371,7 +361,6 @@ class CICDPainter extends CustomPainter {
     
     canvas.drawRRect(rect, paint);
     
-    // Lock icon
     final iconPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
@@ -382,25 +371,10 @@ class CICDPainter extends CustomPainter {
     );
     canvas.drawRRect(lockBody, iconPaint);
     
-    // Lock shackle
-    final shacklePaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-    
-    final shacklePath = Path()
-      ..moveTo(center.dx - 7, center.dy - 2)
-      ..lineTo(center.dx - 7, center.dy - 8)
-      ..quadraticBezierTo(center.dx, center.dy - 15, center.dx + 7, center.dy - 8)
-      ..lineTo(center.dx + 7, center.dy - 2);
-    
-    canvas.drawPath(shacklePath, shacklePaint);
-    
     _drawLabel(canvas, 'IAM', center.translate(0, 35));
   }
 
   void _drawEC2(Canvas canvas, Offset center) {
-    // Pulsing effect for EC2
     final scale = pulseAnimation.value;
     
     canvas.save();
@@ -419,7 +393,6 @@ class CICDPainter extends CustomPainter {
     
     canvas.drawRRect(rect, paint);
     
-    // Server icon
     final serverPaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
@@ -434,17 +407,6 @@ class CICDPainter extends CustomPainter {
         const Radius.circular(2),
       );
       canvas.drawRRect(serverRect, serverPaint);
-      
-      // LED indicators
-      final ledPaint = Paint()
-        ..color = i == 0 ? Colors.green : Colors.orange
-        ..style = PaintingStyle.fill;
-      
-      canvas.drawCircle(
-        center.translate(-20, -20 + i * 20), 
-        3, 
-        ledPaint
-      );
     }
     
     canvas.restore();
@@ -455,7 +417,7 @@ class CICDPainter extends CustomPainter {
   void _drawDockerContainers(Canvas canvas, Offset center) {
     final containerWidth = 80.0;
     final containerHeight = 60.0;
-    final spacing = 10.0;
+    final spacing = 15.0;
     
     final containers = [
       {'name': 'nginx', 'color': Colors.green},
@@ -480,111 +442,77 @@ class CICDPainter extends CustomPainter {
       
       canvas.drawRRect(rect, paint);
       
-      // Docker logo
-      final dockerPaint = Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill;
-      
-      final logoSize = 15.0;
-      final logoRect = Rect.fromCenter(center: offset, width: logoSize, height: logoSize * 0.8);
-      canvas.drawRect(logoRect, dockerPaint);
-      
       _drawLabel(canvas, containers[i]['name'] as String, offset.translate(0, 25), fontSize: 10);
     }
     
     _drawLabel(canvas, 'Docker Containers', center.translate(0, 50));
   }
 
-  void _drawSequentialConnections(Canvas canvas, Size size, Function getStageOpacity) {
-    final centerX = size.width / 2;
-    final rowHeight = size.height / 8;
-    
-    // 연결선 정의 (각 연결선이 어느 단계에 속하는지)
+  void _drawSequentialConnections(Canvas canvas, List<Offset> positions, Function getStageOpacity) {
+    // 연결선 정의
     final connections = [
-      // Stage 0 -> 1: Developer to GitHub
-      {'stage': 1, 'start': Offset(centerX, rowHeight * 1.1), 'end': Offset(centerX, rowHeight * 1.5)},
-      // Stage 1 -> 2: GitHub to Actions
-      {'stage': 2, 'start': Offset(centerX, rowHeight * 2.1), 'end': Offset(centerX, rowHeight * 2.5)},
-      // Stage 2 -> 3: Actions to Docker Build
-      {'stage': 3, 'start': Offset(centerX, rowHeight * 3.1), 'end': Offset(centerX, rowHeight * 3.5)},
-      // Stage 3 -> 4: Docker Build to ECR/IAM (split)
-      {'stage': 4, 'start': Offset(centerX, rowHeight * 4.1), 'end': Offset(centerX - 80, rowHeight * 4.5)},
-      {'stage': 4, 'start': Offset(centerX, rowHeight * 4.1), 'end': Offset(centerX + 80, rowHeight * 4.5)},
-      // Stage 4 -> 5: ECR/IAM to EC2 (merge)
-      {'stage': 5, 'start': Offset(centerX - 80, rowHeight * 5.1), 'end': Offset(centerX, rowHeight * 5.5)},
-      {'stage': 5, 'start': Offset(centerX + 80, rowHeight * 5.1), 'end': Offset(centerX, rowHeight * 5.5)},
-      // Stage 5 -> 6: EC2 to Containers
-      {'stage': 6, 'start': Offset(centerX, rowHeight * 6.1), 'end': Offset(centerX, rowHeight * 6.5)},
+      {'from': 0, 'to': 1, 'stage': 1},  // Developer to GitHub
+      {'from': 1, 'to': 2, 'stage': 2},  // GitHub to Actions
+      {'from': 2, 'to': 3, 'stage': 3},  // Actions to Docker
+      {'from': 3, 'to': 4, 'stage': 4},  // Docker to ECR/IAM
+      {'from': 4, 'to': 5, 'stage': 5},  // ECR/IAM to EC2
+      {'from': 5, 'to': 6, 'stage': 6},  // EC2 to Containers
     ];
     
-    for (final connection in connections) {
-      final stage = connection['stage'] as int;
-      final start = connection['start'] as Offset;
-      final end = connection['end'] as Offset;
+    for (final conn in connections) {
+      final from = conn['from'] as int;
+      final to = conn['to'] as int;
+      final stage = conn['stage'] as int;
       final opacity = getStageOpacity(stage);
       
       if (opacity > 0) {
-        final path = Path()
-          ..moveTo(start.dx, start.dy)
-          ..lineTo(end.dx, end.dy);
-        
-        // 배경 점선
-        final dashPaint = Paint()
-          ..color = AppTheme.awsOrange.withOpacity(0.2 * opacity)
-          ..strokeWidth = 2
-          ..style = PaintingStyle.stroke;
-        
-        _drawDashedPath(canvas, path, dashPaint);
-        
-        // 애니메이션 선
-        final animPaint = Paint()
-          ..color = AppTheme.awsOrange.withOpacity(opacity)
-          ..strokeWidth = 3
-          ..style = PaintingStyle.stroke;
-        
-        final metrics = path.computeMetrics().first;
-        final extractPath = metrics.extractPath(0, metrics.length * opacity);
-        
-        canvas.drawPath(extractPath, animPaint);
-        
-        // 화살표
-        if (opacity > 0.5) {
-          final tangent = metrics.getTangentForOffset(metrics.length * opacity);
-          if (tangent != null) {
-            _drawArrow(canvas, tangent.position, tangent.angle, animPaint);
-          }
+        // Special handling for split connections
+        if (from == 3 && to == 4) {
+          // Docker to ECR/IAM (split)
+          _drawConnection(canvas, positions[from], Offset(positions[to].dx - 100, positions[to].dy), opacity);
+          _drawConnection(canvas, positions[from], Offset(positions[to].dx + 100, positions[to].dy), opacity);
+        } else if (from == 4 && to == 5) {
+          // ECR/IAM to EC2 (merge)
+          _drawConnection(canvas, Offset(positions[from].dx - 100, positions[from].dy), positions[to], opacity);
+          _drawConnection(canvas, Offset(positions[from].dx + 100, positions[from].dy), positions[to], opacity);
+        } else {
+          _drawConnection(canvas, positions[from], positions[to], opacity);
         }
       }
     }
   }
 
-  void _drawDashedPath(Canvas canvas, Path path, Paint paint) {
-    final dashWidth = 5.0;
-    final dashSpace = 5.0;
-    final metrics = path.computeMetrics();
+  void _drawConnection(Canvas canvas, Offset start, Offset end, double opacity) {
+    final path = Path()
+      ..moveTo(start.dx, start.dy + 30)
+      ..lineTo(end.dx, end.dy - 30);
     
-    for (final metric in metrics) {
-      double distance = 0.0;
-      while (distance < metric.length) {
-        final extractPath = metric.extractPath(distance, distance + dashWidth);
-        canvas.drawPath(extractPath, paint);
-        distance += dashWidth + dashSpace;
-      }
+    final paint = Paint()
+      ..color = AppTheme.awsOrange.withOpacity(opacity)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+    
+    canvas.drawPath(path, paint);
+    
+    // Arrow
+    if (opacity > 0.5) {
+      final angle = math.atan2(end.dy - start.dy, end.dx - start.dx) + math.pi / 2;
+      canvas.save();
+      canvas.translate(end.dx, end.dy - 30);
+      canvas.rotate(angle);
+      
+      final arrowPath = Path()
+        ..moveTo(0, 0)
+        ..lineTo(-5, -10)
+        ..lineTo(5, -10)
+        ..close();
+      
+      canvas.drawPath(arrowPath, Paint()
+        ..color = AppTheme.awsOrange.withOpacity(opacity)
+        ..style = PaintingStyle.fill);
+      
+      canvas.restore();
     }
-  }
-
-  void _drawArrow(Canvas canvas, Offset position, double angle, Paint paint) {
-    final arrowSize = 10.0;
-    final arrowPath = Path()
-      ..moveTo(0, -arrowSize / 2)
-      ..lineTo(arrowSize, 0)
-      ..lineTo(0, arrowSize / 2);
-    
-    canvas.save();
-    canvas.translate(position.dx, position.dy);
-    canvas.rotate(angle);
-    canvas.drawPath(arrowPath, paint);
-    canvas.restore();
   }
 
   void _drawLabel(Canvas canvas, String text, Offset position, {double fontSize = 12}) {
@@ -608,29 +536,21 @@ class CICDPainter extends CustomPainter {
     );
   }
 
-  void _drawLabels(Canvas canvas, Size size) {
-    final centerX = size.width / 2;
-    final rowHeight = size.height / 8;
-    
-    // Step labels for vertical layout
+  void _drawLabels(Canvas canvas, List<Offset> positions) {
     final steps = [
-      {'pos': Offset(40, rowHeight * 0.8), 'text': '1. Code Push'},
-      {'pos': Offset(40, rowHeight * 2.8), 'text': '2. Trigger CI/CD'},
-      {'pos': Offset(40, rowHeight * 3.8), 'text': '3. Build Image'},
-      {'pos': Offset(40, rowHeight * 4.8), 'text': '4. Push to ECR'},
-      {'pos': Offset(40, rowHeight * 5.8), 'text': '5. Deploy to EC2'},
-      {'pos': Offset(40, rowHeight * 6.8), 'text': '6. Run Containers'},
+      '1. Code Push',
+      '2. Webhook',
+      '3. CI/CD Trigger',
+      '4. Build Image',
+      '5. Push to ECR',
+      '6. Deploy',
+      '7. Run Services',
     ];
     
-    final stepPaint = Paint()
-      ..color = AppTheme.awsDeepBlue
-      ..style = PaintingStyle.fill;
-    
-    for (final step in steps) {
-      final pos = step['pos'] as Offset;
-      final text = step['text'] as String;
+    for (int i = 0; i < steps.length && i < positions.length; i++) {
+      final pos = Offset(40, positions[i].dy);
       
-      // Step number background
+      // Step circle
       final circlePaint = Paint()
         ..color = AppTheme.awsOrange
         ..style = PaintingStyle.fill;
@@ -640,7 +560,7 @@ class CICDPainter extends CustomPainter {
       // Step number
       final numberPainter = TextPainter(
         text: TextSpan(
-          text: text.substring(0, 1),
+          text: '${i + 1}',
           style: const TextStyle(
             color: Colors.white,
             fontSize: 14,
@@ -657,7 +577,7 @@ class CICDPainter extends CustomPainter {
       );
       
       // Step text
-      _drawLabel(canvas, text.substring(3), pos.translate(30, 0), fontSize: 14);
+      _drawLabel(canvas, steps[i].substring(3), pos.translate(30, 0), fontSize: 14);
     }
   }
 
