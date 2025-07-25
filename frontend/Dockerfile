@@ -19,6 +19,9 @@ RUN curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable
 
 ENV PATH="/opt/flutter/bin:/opt/flutter/bin/cache/dart-sdk/bin:${PATH}"
 
+# Git 안전 디렉토리 설정
+RUN git config --global --add safe.directory /opt/flutter
+
 # Flutter 초기화 및 웹 활성화
 RUN flutter --version && \
     flutter doctor -v && \

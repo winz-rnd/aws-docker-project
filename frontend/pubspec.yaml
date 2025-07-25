@@ -17,7 +17,6 @@ dependencies:
   
   # 애니메이션 및 UI 개선
   animated_text_kit: ^4.2.2  # 텍스트 애니메이션
-  shimmer: ^3.0.0           # 로딩 효과
 
 dev_dependencies:
   flutter_test:
