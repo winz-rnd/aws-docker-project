@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 import '../lib/main.dart';
 
 void main() {
@@ -6,30 +7,41 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
     
-    // Wait for initial frame
-    await tester.pump();
+    // Wait for initial frame and animations
+    await tester.pumpAndSettle();
     
-    // AnimatedTextKit may be in progress, so check for partial text or widget type
-    // We can check for the AppBar or other static elements instead
+    // AnimatedTextKit may be in progress, so check for the AppBar widget
     expect(find.byType(MyHomePage), findsOneWidget);
-
-    // Scroll down to find buttons (they might be below the fold)
-    await tester.pump(const Duration(seconds: 1));
     
-    // Check for main widgets existence
-    expect(find.textContaining('Message Manager'), findsOneWidget);
-    expect(find.textContaining('API Server'), findsOneWidget);
-    expect(find.textContaining('Database'), findsOneWidget);
+    // Find the CustomScrollView
+    final scrollViewFinder = find.byType(CustomScrollView);
+    expect(scrollViewFinder, findsOneWidget);
     
-    // Verify that buttons exist by scrolling if necessary
-    final getMessageButton = find.text('Get Message');
-    final saveMessageButton = find.text('Save Message');
+    // Scroll down to find the Message Manager section
+    await tester.dragUntilVisible(
+      find.text('Message Manager'),
+      scrollViewFinder,
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
     
-    // Scroll to find buttons
-    await tester.ensureVisible(getMessageButton);
-    await tester.ensureVisible(saveMessageButton);
+    // Now check for Message Manager
+    expect(find.text('Message Manager'), findsOneWidget);
     
-    expect(getMessageButton, findsOneWidget);
-    expect(saveMessageButton, findsOneWidget);
+    // Continue scrolling to find buttons
+    await tester.dragUntilVisible(
+      find.text('Get Message'),
+      scrollViewFinder,
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+    
+    // Verify that buttons exist
+    expect(find.text('Get Message'), findsOneWidget);
+    expect(find.text('Save Message'), findsOneWidget);
+    
+    // Check for other key elements
+    expect(find.text('API Server'), findsOneWidget);
+    expect(find.text('Database'), findsOneWidget);
   });
 }
