@@ -156,9 +156,26 @@ jobs:
           export ECR_REPOSITORY_FRONTEND=${{ env.ECR_REPOSITORY_FRONTEND }}
           
           # Run deployment with production compose file
+          echo "Stopping current containers..."
           docker-compose -f docker-compose.production.yml down || true
+          
+          # Remove old images to force fresh pull
+          echo "Removing old frontend image..."
+          docker rmi ${ECR_REGISTRY}/${ECR_REPOSITORY_FRONTEND}:latest || true
+          
+          echo "Pulling latest images..."
           docker-compose -f docker-compose.production.yml pull
+          
+          echo "Starting new containers..."
           docker-compose -f docker-compose.production.yml up -d
+          
+          # Wait for containers to be healthy
+          echo "Waiting for containers to be ready..."
+          sleep 10
+          
+          # Show container status
+          docker ps
+          docker logs frontend --tail 20
         EOF
         
         # Clean up
