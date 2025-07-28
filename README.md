@@ -33,6 +33,17 @@ AWS_Docker/
 ## 시작하기
 
 ### 1. 개발 환경 설정
+
+#### 자동 빌드 및 배포 (권장)
+```bash
+# Linux/Mac
+./build-and-deploy.sh
+
+# Windows PowerShell
+.\build-and-deploy.ps1
+```
+
+#### 수동 Docker Compose 실행
 ```bash
 # 전체 프로젝트 클론 후
 cd AWS_Docker
