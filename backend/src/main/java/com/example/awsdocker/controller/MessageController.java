@@ -21,17 +21,6 @@ public class MessageController {
         this.messageService = messageService;
     }
     
-    /**
-     * 헬스체크 엔드포인트
-     */
-    @GetMapping("/health")
-    public ResponseEntity<Map<String, String>> health() {
-        return ResponseEntity.ok(Map.of(
-            "status", "UP",
-            "service", "AWS Docker Backend",
-            "timestamp", java.time.LocalDateTime.now().toString()
-        ));
-    }
     
     /**
      * 랜덤 메시지 조회 (Flutter에서 주로 사용할 엔드포인트)
