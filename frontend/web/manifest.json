@@ -1,11 +1,11 @@
 {
-    "name": "Simple Flutter Test",
-    "short_name": "Flutter Test",
+    "name": "AWS Docker Demo",
+    "short_name": "AWS Demo",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A simple Flutter web test application",
+    "background_color": "#232F3E",
+    "theme_color": "#FF9900",
+    "description": "AWS Full Stack Demo with Flutter, Spring Boot, and MySQL",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": []
